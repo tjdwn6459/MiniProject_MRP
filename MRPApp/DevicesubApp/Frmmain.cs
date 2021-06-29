@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -60,7 +61,7 @@ namespace DevicesubApp
         private void Timer_Tick(object sender, EventArgs e)
         {
             LblResult.Text = sw.Elapsed.Seconds.ToString(); //시간이 지난것을 출력해준다
-            if(sw.Elapsed.Seconds >= 3) //데이터 들어오고 3초지나면 처리!!
+            if(sw.Elapsed.Seconds >= 2) //데이터 들어오고 2초지나면 처리!!
             {
                 sw.Stop();
                 sw.Reset();
@@ -85,12 +86,11 @@ namespace DevicesubApp
                 {
                     var prcResult = correctData["PRC_MSG"] == "OK" ? 1 : 0;
                     string strUpQry = $"UPDATE Process_DEV " +
-                                      $" SET PrcEndTime = '{DateTime.Now.ToString("HH:mm:ss")}' " +
-                                      $"     ,PrcResult = '{prcResult}' " +
+                                      $" SET PrcResult = '{prcResult}' " +
                                       $"     ,ModDate = '{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }' " +
                                       $"     ,ModID = '{"SYS"}' " +
                                       $"WHERE PrcIdx = " +
-                                      $"(SELECT TOP 1 PrcIdx FROM Process_DEV ORDER BY PrcIdx DESC)";
+                                      $"(SELECT TOP 1 PrcIdx FROM Process ORDER BY PrcIdx DESC)";
 
                     try
                     {
@@ -106,6 +106,11 @@ namespace DevicesubApp
                         UpdateText($">>>>> DB ERROR !! : { ex.Message}");
                     }
                 }
+
+                //JObject result = new JObject();
+                //result.Add("PRC_MSG", correctData["PRC_MSG"]);
+
+                //client.Publish("factory1/monitor/data", )
             }
 
             iotData.Clear(); //데이터 모두 삭제

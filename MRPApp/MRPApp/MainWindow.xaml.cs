@@ -42,17 +42,19 @@ namespace MRPApp
         {
             /* if (Commons.LOGINED_USER != null)
                  BtnLoginedId.Content = $"{Commons.LOGINED_USER.UserEmail} ({Commons.LOGINED_USER.UserName})";*/
-            var plantCode = ConfigurationManager.AppSettings["PlantCode"];
+            //var plantCode = ConfigurationManager.AppSettings["PlantCode"];
             //BtnPlantName.Content = temp;
             //
 
-            
+            Commons.PLANTCODE = ConfigurationManager.AppSettings.Get("plantcode");
+            Commons.FACILITYID = ConfigurationManager.AppSettings.Get("facilityid");
+
 
             try
             {
-                var plantName = Logic.DataAccess.Getsettings().Where(c => c.BasicCode.Equals(plantCode)).FirstOrDefault().CodeName;
+                var plantName = Logic.DataAccess.Getsettings().Where(c => c.BasicCode.Equals(Commons.PLANTCODE)).FirstOrDefault().CodeName;
                 BtnPlantName.Content = plantName;
-                Commons.PLANTCODE = plantCode;
+
             }
             catch (Exception ex)
             {
@@ -60,7 +62,7 @@ namespace MRPApp
             }
         }
 
-       
+
         private async void Btnexit_Click(object sender, RoutedEventArgs e)
         {
             var result = await this.ShowMessageAsync("종료", "프로그램을 종료하시겠습니까? ",
@@ -69,7 +71,7 @@ namespace MRPApp
             if (result == MessageDialogResult.Affirmative)
                 Application.Current.Shutdown();
         }
-      
+
 
         private async void BtnAccount_Click(object sender, RoutedEventArgs e)
         {
