@@ -66,8 +66,10 @@ namespace DevicesubApp
                 sw.Stop();
                 sw.Reset();
                 //TODO 실제 처리 프로세스 실행
-               // UpdateText("처리 !!");
+                // UpdateText("처리 !!");
                 PrcCorrectDataToDB();
+                
+                
                 //ClearData(); ->전역에 있는 것 다 지우는
 
             }
@@ -80,32 +82,36 @@ namespace DevicesubApp
             {
                 var correctData = iotData[iotData.Count - 1];
                 //Db입력
-              // UpdateText("DB처리");
-
-                using ( var conn = new SqlConnection(connectionString))
+                // UpdateText("DB처리");
+                if (correctData["PRC_MSG"] == "OK" || correctData["PRC_MSG"] == "FAIL")
                 {
-                    var prcResult = correctData["PRC_MSG"] == "OK" ? 1 : 0;
-                    string strUpQry = $"UPDATE Process_DEV " +
-                                      $" SET PrcResult = '{prcResult}' " +
-                                      $"     ,ModDate = '{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }' " +
-                                      $"     ,ModID = '{"SYS"}' " +
-                                      $"WHERE PrcIdx = " +
-                                      $"(SELECT TOP 1 PrcIdx FROM Process ORDER BY PrcIdx DESC)";
+                    using (var conn = new SqlConnection(connectionString))
+                    {
+                        var prcResult = correctData["PRC_MSG"] == "OK" ? 1 : 0;
+                        string strUpQry = $"UPDATE Process " +
+                                          $" SET PrcResult = '{prcResult}' " +
+                                          $"     ,ModDate = '{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }' " +
+                                          $"     ,ModID = '{"SYS"}' " +
+                                          $"WHERE PrcIdx = " +
+                                          $"(SELECT TOP 1 PrcIdx FROM Process ORDER BY PrcIdx DESC)";
 
-                    try
-                    {
-                        conn.Open();
-                        SqlCommand cmd = new SqlCommand(strUpQry, conn);
-                        if (cmd.ExecuteNonQuery() == 1)
-                            UpdateText("[DB] 센싱값 Update 성공");
-                        else
-                            UpdateText("[DB] 센싱값 Update 실패");
+                        try
+                        {
+                            conn.Open();
+                            SqlCommand cmd = new SqlCommand(strUpQry, conn);
+                            if (cmd.ExecuteNonQuery() == 1)
+                                UpdateText("[DB] 센싱값 Update 성공");
+                            else
+                                UpdateText("[DB] 센싱값 Update 실패");
+                        }
+                        catch (Exception ex)
+                        {
+                            UpdateText($">>>>> DB ERROR !! : { ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        UpdateText($">>>>> DB ERROR !! : { ex.Message}");
-                    }
+
                 }
+                              
 
                 //JObject result = new JObject();
                 //result.Add("PRC_MSG", correctData["PRC_MSG"]);
@@ -124,6 +130,8 @@ namespace DevicesubApp
                 UpdateText($">>>>>받은메세지 : {message}");
                 //message(json) > C#
                 var currentData = JsonConvert.DeserializeObject<Dictionary<string, string>>(message);
+
+                
                 PrcInputDataToList(currentData);
 
                 //timer_tick에서 메세지를 출력한다

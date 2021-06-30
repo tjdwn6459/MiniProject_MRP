@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using uPLibrary.Networking.M2Mqtt;
 using uPLibrary.Networking.M2Mqtt.Messages;
 
@@ -68,6 +69,7 @@ namespace MRPApp.View.Process
                     LblSchAmount.Content = $"{currSchedule.SchAmount}개";
                     BtnStartProcess.IsEnabled = true;
 
+                    UpdateData();
                     InitConnectMqttBroker();//공정시작시 MQTT 브로커에 연결
                 }
 
@@ -75,13 +77,13 @@ namespace MRPApp.View.Process
             catch (Exception ex)
             {
                 Commons.LOGGER.Error($"예외발생 ProcessView Loaded : {ex}");
-                throw ex;
             }
         }
 
         MqttClient client;
-        Timer timer;
-        Stopwatch sw;
+        Timer timer = new Timer();
+        Stopwatch sw = new Stopwatch();
+        bool prcResult;
 
         private void InitConnectMqttBroker()
         {
@@ -99,12 +101,56 @@ namespace MRPApp.View.Process
 
         private void Timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if(sw.Elapsed.Seconds >= 2) //2초 대기후
+            if (sw.Elapsed.Seconds >= 2) //2초 대기후
             {
                 sw.Stop();
                 sw.Reset();
-                MessageBox.Show(currentData["PRC_MSG"]);
+                //MessageBox.Show(currentData["PRC_MSG"]);
+                if (currentData["PRC_MSG"] == "OK")
+                {
+                    Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate
+                    {
+                        Product.Fill = new SolidColorBrush(Colors.Green);
+                    }));
+                }
+                 
+                else if (currentData["PRC_MSG"] == "FAIL")
+                {
+                    Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate
+                    {
+                        Product.Fill = new SolidColorBrush(Colors.Red);
+                    }));
+                }
+
+                Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate
+                {
+                    UpdateData();
+                }));
+
             }
+        }
+
+        private void UpdateData()
+        {
+
+            //성공수량
+            var prcOKAmount = Logic.DataAccess.GetProcesses().Where(p => p.SchIdx.Equals(currSchedule.SchIdx))
+                .Where(p => p.PrcResult.Equals(true)).Count();
+
+            //실패수량
+            var prcFailAmount = Logic.DataAccess.GetProcesses().Where(p => p.SchIdx.Equals(currSchedule.SchIdx))
+               .Where(p => p.PrcResult.Equals(false)).Count();
+
+
+            //공정성공률
+            var prcOKRate = (double)prcOKAmount / (double)currSchedule.SchAmount * 100;
+            var prcFailRate = (double)prcFailAmount / (double)currSchedule.SchAmount * 100;
+
+            LblPrcOKAmount.Content = $"{prcOKAmount} 개";
+            LblPrcFailAmount.Content = $"{prcFailAmount} 개";
+            LblPrcOKRate.Content = $"{prcOKRate} %";
+            LblPrcFailRate.Content = $"{prcFailRate} %";
+
         }
 
         Dictionary<string, string> currentData = new Dictionary<string, string>();
@@ -118,28 +164,35 @@ namespace MRPApp.View.Process
             sw.Reset();
             sw.Start();
 
+            
             StartSensorAnimation();
         }
 
         private void StartSensorAnimation()
         {
-            DoubleAnimation ba = new DoubleAnimation();
-            ba.From = 1;//이미지 보임
-            ba.To = 0; //이미지 안보임
-            ba.Duration = TimeSpan.FromSeconds(2);
-            ba.AutoReverse = true;
-            //ba.RepeatBehavior = RepeatBehavior.Forever;
 
-            Sensor.BeginAnimation(Canvas.OpacityProperty, ba);
+            Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate
+               {
+
+
+                   DoubleAnimation ba = new DoubleAnimation();
+                   ba.From = 1;//이미지 보임
+                   ba.To = 0; //이미지 안보임
+                   ba.Duration = TimeSpan.FromSeconds(2);
+                   ba.AutoReverse = true;
+                   //ba.RepeatBehavior = RepeatBehavior.Forever;
+
+                   Sensor.BeginAnimation(Canvas.OpacityProperty, ba);
+               }));
         }
 
         private void BtnStartProcess_Click(object sender, RoutedEventArgs e)
         {
             if (InsertProcessData())
-                StartAnimation();        
+                StartAnimation();
         }
 
-        private  bool InsertProcessData()
+        private bool InsertProcessData()
         {
             var item = new Model.Process();
             item.SchIdx = currSchedule.SchIdx;
@@ -156,7 +209,7 @@ namespace MRPApp.View.Process
             try
             {
                 var result = Logic.DataAccess.SetProcess(item);
-                if(result ==0)
+                if (result == 0)
                 {
                     Commons.LOGGER.Error("공정데이터 입력 실패 !!");
                     Commons.ShowMessageAsync("오류", "공정시작 오류발생, 관리자 문의");
@@ -175,7 +228,7 @@ namespace MRPApp.View.Process
                 Commons.ShowMessageAsync("오류", "공정시작 오류발생, 관리자 문의");
                 return false;
             }
-            
+
         }
 
         private string GetProcessCodeFromDB()
@@ -187,9 +240,9 @@ namespace MRPApp.View.Process
             //이전까지 공정이 없어 PRC20210629..)null이 넘어오고
             //PRC20210620001, 002, 003, 004 ->PRC20210629004
             var maxPrc = Logic.DataAccess.GetProcesses().Where(p => p.PrcCD.Contains(prePrcCode))
-                            .OrderByDescending(p =>p.PrcCD).FirstOrDefault();
+                            .OrderByDescending(p => p.PrcCD).FirstOrDefault();
 
-            if(maxPrc == null)
+            if (maxPrc == null)
             {
                 resultCode = prePrcCode + "001";
             }
@@ -205,6 +258,10 @@ namespace MRPApp.View.Process
 
         private void StartAnimation()
         {
+
+            Product.Fill = new SolidColorBrush(Colors.Gray); //다시 색을 그레이로 바꾸다 
+
+
             //기어 애니메이션 속성
             DoubleAnimation da = new DoubleAnimation();
             da.From = 0;
@@ -231,6 +288,13 @@ namespace MRPApp.View.Process
 
             Product.BeginAnimation(Canvas.LeftProperty, ma);
 
+        }
+
+        private void Page_Unloaded(object sender, RoutedEventArgs e)
+        {
+            //자원해제(메모리 상에 남지 않게)
+            if (client.IsConnected) client.Disconnect();
+            timer.Dispose();
         }
     }
 }
