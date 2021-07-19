@@ -4,8 +4,10 @@ miniproject
 
 
 ## 공정계획
+
 ### 공장, 공정일, 공정설비, 계획수량에 따라 계획을 만든다 
 ![공정계획](https://user-images.githubusercontent.com/77951833/126148651-ad3f6488-1270-4ac7-99c7-d3ac634e26d1.png)
+
 ## 공정일을 해당일로 설정시 공정 모니터링 시작
 ![공정모니터링 시작](https://user-images.githubusercontent.com/77951833/126149024-0544bbfc-04e4-4570-ac82-12a0de20f05f.png)
 
