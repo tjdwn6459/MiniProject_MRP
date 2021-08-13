@@ -1,7 +1,9 @@
 ﻿using MRPApp.Model;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data.Entity.Migrations;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,20 +13,22 @@ namespace MRPApp.Logic
 {
     public class DataAccess
     {
+
+
         //셋팅테이블에서 데이터 가져오기
         public static List<Settings> Getsettings()
         {
-            List<Model.Settings> settings;
+            List<Model.Settings> list;
 
             using (var ctx = new MRPEntities())
-                settings = ctx.Settings.ToList(); //SELECT
+                list = ctx.Settings.ToList(); //SELECT
 
 
-            return settings;
+            return list;
         }
 
 
-        internal static int SetSettings(Settings item)
+        public static int SetSettings(Settings item)
         {
             using (var ctx = new MRPEntities())
             {
@@ -34,7 +38,7 @@ namespace MRPApp.Logic
 
         }
 
-        internal static int DelSettings(Settings item)
+        public static int DelSettings(Settings item)
         {
             using (var ctx = new MRPEntities())
             {
@@ -76,11 +80,91 @@ namespace MRPApp.Logic
 
         internal static int SetProcess(Process item)
         {
-            using(var ctx = new MRPEntities())
+            using (var ctx = new MRPEntities())
             {
                 ctx.Process.AddOrUpdate(item);
                 return ctx.SaveChanges();
             }
+        }
+
+        internal static List<Report> GetReportDatas(string startDate, string endDate, string plantCode)
+        {
+            var connString = ConfigurationManager.ConnectionStrings["MRPConnString"].ToString();
+            var list = new List<Report>();
+            var lastObj = new Model.Report(); //추가 : 최종 report값 담는 변수 
+
+            using (var conn = new SqlConnection(connString))
+            {
+                conn.Open();//중요!!
+                var sqlQuery = $@"SELECT sch.SchIdx, sch.PlantCode , sch.SchAmount,  prc.PrcDate,
+	                                   prc.PrcOKAmount, prc.PrcFailAmount
+                                  FROM Schedules AS sch
+                                INNER JOIN (
+	                                SELECT smr.SchIdx, smr.PrcDate, 
+		                                SUM(smr.PrcOK) AS PrcOKAmount, SUM(smr.PrcFail) AS PrcFailAmount
+	                                FROM (
+		                                  SELECT p.SchIdx, p.PrcDate,
+				                                CASE p.PrcResult WHEN 1 THEN 1 ELSE 0 END AS PrcOK,
+				                                CASE p.PrcResult WHEN 0 THEN 1 ELSE 0 END AS PrcFail
+	                                        FROM Process As p
+		                                 ) AS smr
+	                                GROUP BY smr.SchIdx, smr.PrcDate
+                                ) AS prc
+                                  ON sch.SchIdx = prc.SchIdx
+                                WHERE sch.PlantCode = '{plantCode}'
+                                   AND prc.PrcDate BETWEEN '{startDate}' AND '{endDate}'";
+
+                var cmd = new SqlCommand(sqlQuery, conn);
+                var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    var tmp = new Report
+                    {
+                        SchIdx = (int)reader["SchIdx"],
+                        PlantCode = reader["plantCode"].ToString(),
+                        PrcDate = DateTime.Parse(reader["PrcDate"].ToString()),
+                        SchAmount = (int)reader["SchAmount"],
+                        PrcOKAmount = (int)reader["PrcOKAmount"],
+                        PrcFailAmount = (int)reader["PrcFailAmount"]
+
+                    };
+                    list.Add(tmp);
+                    lastObj = tmp; //마지막 값을 할당
+                }
+
+                //시작일부터 종료일까지 없는 값 만들어주는 로직
+
+                var DtStart = DateTime.Parse(startDate);
+                var DtEnd = DateTime.Parse(endDate);
+                var DtCurrent = DtStart;
+
+                while (DtCurrent < DtEnd)
+                {
+                    var count = list.Where(c => c.PrcDate.Equals(DtCurrent)).Count();
+                    if (count == 0)
+                    {
+                        //새로운 report(없는 날짜)
+                        var tmp = new Report
+                        {
+                            SchIdx = lastObj.SchIdx,
+                            PlantCode = lastObj.PlantCode,
+                            PrcDate = DtCurrent,
+                            SchAmount = 0,
+                            PrcOKAmount = 0,
+                            PrcFailAmount = 0
+                        };
+                        list.Add(tmp);
+                    }
+                    DtCurrent = DtCurrent.AddDays(1); //날하루 증가
+                }
+
+
+
+            }
+
+            list.Sort((reportA, reportB) => reportA.PrcDate.CompareTo(reportB.PrcDate)); // 가장오래된 날짜부터 오름차순 정렬
+            return list;
         }
     }
 }
